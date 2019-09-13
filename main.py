@@ -3,7 +3,7 @@ from google.cloud import datastore
 
 app = Flask(__name__, static_url_path='')
 
-DS = datastore.Client(project='events-252318')
+DS = datastore.Client(project='countdown-252800')
 EVENT = 'Event'  # Name of the event table, can be anything you like.
 ROOT = DS.key('Entities', 'root')  # Name of root key, can be anything.
 
@@ -67,6 +67,7 @@ def event():
     para = request.get_data().decode('UTF-8').split()
     name = para[0]
     r_date = para[1]
+    print(r_date)
     [y, m, d] = r_date.split('-')
     date = d + '-' + m + '-' + y
     x = put_event(name, date)

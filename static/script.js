@@ -39,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
             '    <th>Time Left (d:h:m:s)</th>\n' +
             '  </tr>';
     for (let event of data.events) {
-
         var datest = event.date.split('-');
         var target = new Date(+datest[2], datest[1]-1, +datest[0]);
         var time = Math.floor((+target - new Date()) / 1000);
