@@ -64,7 +64,7 @@ def event():
                     description: Event ID to be returned.
                     schema: string
         """
-    para = request.get_data().decode('UTF-8').split()
+    para = request.data.decode('UTF-8').split()
     name = para[0]
     r_date = para[1]
     print(r_date)

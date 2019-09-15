@@ -32,11 +32,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // There are better ways, but this is illustrative of the concept:
     setInterval(function () {
-        let html = '<table>' +
+        let html = '<table id="table">' +
             '<tr>\n' +
             '    <th>Event Name</th>\n' +
             '    <th>Event Date (dd-mm-yyyy)</th> \n' +
             '    <th>Time Left (d:h:m:s)</th>\n' +
+            '    <th>Click To Delete</th>\n' +
             '  </tr>';
     for (let event of data.events) {
         var datest = event.date.split('-');
@@ -71,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
             time %= 60;
             var second = Math.floor(time);
 
-            html += `<tr><td>${event.name} </td> <td> ${event.date} </td><td> ${day}:${hour}:${minute}:${second}</td> </tr>`;
+            html += `<tr><td>${event.name} </td> <td> ${event.date} </td><td> ${day}:${hour}:${minute}:${second}</td><td><button name=${event.name}+'-'+${event.date}> REMOVE</button></td></tr>`;
         }
     }
     document.getElementById('events').innerHTML = html;
@@ -94,20 +95,26 @@ document.addEventListener('DOMContentLoaded',() =>{
     if( !document.getElementById('name').value || !document.getElementById('date').value)
         alert("either name or date is not entered ");
     else {
-        $.ajax({
-            type: "POST",
-            url: "/event",
-            dataType: "json",
-            data: document.getElementById('name').value + ' ' + document.getElementById('date').value,
-            success: function (data) {
-                console.log('Success');
-                alert("Event created with id: "+data+" name: " + document.getElementById('name').value + " and date: " + document.getElementById('date').value);
+        // $.ajax({
+        //     type: "POST",
+        //     url: "/event",
+        //     dataType: "json",
+        //     data: document.getElementById('name').value + ' ' + document.getElementById('date').value,
+        //     success: function (data) {
+        //         console.log('Success');
+        //         alert("Event created with id: "+data+" name: " + document.getElementById('name').value + " and date: " + document.getElementById('date').value);
+        //         document.location.reload();
+        //     },
+        //     error: function () {
+        //         console.log('Error');
+        //     }
+        // });
+        var data = document.getElementById('name').value + ' ' + document.getElementById('date').value;
+        reqJSON('POST','/event', data)
+            .then(({status, data}) =>{
+                alert('event made successfully with id: '+ data);
                 document.location.reload();
-            },
-            error: function () {
-                console.log('Error');
-            }
-        });
+            });
     }
   });
 });
