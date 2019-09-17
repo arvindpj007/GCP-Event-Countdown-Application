@@ -18,20 +18,22 @@ function reqJSON(method, url, data) {
   });
 }
 
+function deleteEvent(name,date) {
+    console.log('delete:'+name+date);
+
+    reqJSON('POST','/delete', date+' '+name)
+    .then(({status, data}) =>{
+        alert('The event with name: ' + name + ' and date: ' + date + ' are deleted');
+        document.location.reload();
+    });
+
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   reqJSON('GET', '/events')
   .then(({status, data}) => {
-    // Use the *data* argument to change what we see on the page.
-    // It will look something like this:
-    // {
-    //   "events": [
-    //     {"name": "Grandma's Birthday", "date": "08-05"},
-    //     {"name": "Independence Day", "date": "07-04"}
-    //   ]
-    // }
 
-    // There are better ways, but this is illustrative of the concept:
-    setInterval(function () {
+  setInterval(function () {
         let html = '<table id="table">' +
             '<tr>\n' +
             '    <th>Event Name</th>\n' +
@@ -47,20 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if(time<=0)
         {
            //console.log('negative countdown')
-            $.ajax({
-            type: "POST",
-            url: "/delete",
-            dataType: "json",
-            data: event.date.toString()+' '+event.name.toString(),
-            success: function (data) {
-                console.log('Success');
-                alert('The date you have entered is passed, hence it was automatically deleted')
+            reqJSON('POST','/delete', event.date.toString()+' '+event.name.toString())
+            .then(({status, data}) =>{
+                alert('The event with name: ' + event.name.toString() + ' and date: ' + event.date.toString() + ' are deleted');
                 document.location.reload();
-            },
-            error: function () {
-                console.log('Error');
-            }
-        });
+            });
         }
         else
         {
@@ -72,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
             time %= 60;
             var second = Math.floor(time);
 
-            html += `<tr><td>${event.name} </td> <td> ${event.date} </td><td> ${day}:${hour}:${minute}:${second}</td><td><button name=${event.name}+'-'+${event.date}> REMOVE</button></td></tr>`;
+            html += `<form onsubmit="false"><tr><td>${event.name} </td> <td> ${event.date} </td><td> ${day}:${hour}:${minute}:${second}</td><td><input type="button" name=${event.name}+'-'+${event.date} value="REMOVE" onclick="deleteEvent(\'${event.name}\',\'${event.date}\')"></td></tr></form>`;
         }
     }
     document.getElementById('events').innerHTML = html;
@@ -95,29 +88,44 @@ document.addEventListener('DOMContentLoaded',() =>{
     if( !document.getElementById('name').value || !document.getElementById('date').value)
         alert("either name or date is not entered ");
     else {
-        // $.ajax({
-        //     type: "POST",
-        //     url: "/event",
-        //     dataType: "json",
-        //     data: document.getElementById('name').value + ' ' + document.getElementById('date').value,
-        //     success: function (data) {
-        //         console.log('Success');
-        //         alert("Event created with id: "+data+" name: " + document.getElementById('name').value + " and date: " + document.getElementById('date').value);
-        //         document.location.reload();
-        //     },
-        //     error: function () {
-        //         console.log('Error');
-        //     }
-        // });
-        var data = document.getElementById('name').value + ' ' + document.getElementById('date').value;
-        reqJSON('POST','/event', data)
+
+        var datest = document.getElementById('date').value.split('-');
+        var target = new Date(+datest[2], datest[1]-1, +datest[0]);
+        var time = Math.floor((+target - new Date()) / 1000);
+
+        if(time<=0)
+        {
+            alert('Event cannot be made, The date provided is already passed');
+            document.location.reload();
+        }
+        else
+        {
+            var data = document.getElementById('name').value + ' ' + document.getElementById('date').value;
+            reqJSON('POST','/event', data)
             .then(({status, data}) =>{
                 alert('event made successfully with id: '+ data);
                 document.location.reload();
             });
+        }
     }
   });
 });
+
+
+// $.ajax({
+//     type: "POST",
+//     url: "/event",
+//     dataType: "json",
+//     data: document.getElementById('name').value + ' ' + document.getElementById('date').value,
+//     success: function (data) {
+//         console.log('Success');
+//         alert("Event created with id: "+data+" name: " + document.getElementById('name').value + " and date: " + document.getElementById('date').value);
+//         document.location.reload();
+//     },
+//     error: function () {
+//         console.log('Error');
+//     }
+// });
 
 // function listner()
 // {
