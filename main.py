@@ -1,11 +1,15 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, session, redirect, url_for
 from google.cloud import datastore
+import os
+import bcrypt
 
 app = Flask(__name__, static_url_path='')
+app.secret_key = os.urandom(24)
 
 DS = datastore.Client(project='countdown-252800')
 EVENT = 'Event'  # Name of the event table, can be anything you like.
 ROOT = DS.key('Entities', 'root')  # Name of root key, can be anything.
+USER = 'User'
 
 
 @app.route('/')
@@ -18,7 +22,7 @@ def hello_world():
                 200:
                     description: The events list and the option to add a new event.
         """
-    return app.send_static_file('index.html')
+    return app.send_static_file('login.html')
 
 
 @app.route('/events')
@@ -102,6 +106,62 @@ def delete():
     return "1"
 
 
+@app.route('/loginUser', methods=['POST'])
+def login_user():
+    try:
+        para = request.get_data().decode('UTF-8').split()
+        username = para[0]
+        password = para[1]
+        fetch_password = None
+        b_password = password.encode('UTF-8')
+        print(username, password)
+        query = DS.query(kind=USER)
+        query.add_filter('username', '=', username)
+        next_entity = query.fetch()
+
+        for val in next_entity:
+            fetch_password = val['password']
+
+        if fetch_password is None:
+            print('no such user')
+            return '0'
+        else:
+            fetch_hash = fetch_password.encode('UTF-8')
+            if bcrypt.checkpw(b_password, fetch_hash):
+                print('correct')
+            else:
+                print('incorrect password')
+                return '0'
+
+    except Exception as e:
+        print(e)
+
+    return '1'
+
+
+@app.route('/update_session')
+def update_session():
+    return redirect('/events', 302)
+
+
+@app.route('/registerUser', methods=['POST'])
+def register_user():
+    # try:
+    para = request.get_data().decode('UTF-8').split()
+    username = para[0]
+    password = para[1]
+    b_password = password.encode('UTF-8')
+    hashed = bcrypt.hashpw(b_password, bcrypt.gensalt())
+    s_hashed = str(hashed.decode('UTF-8'))
+    entity = datastore.Entity(key=DS.key('User'))
+    entity.update({'username': username, 'password': s_hashed})
+    DS.put(entity)
+    # print(username, password)
+    # except Exception as e:
+    #     print(e)
+    return '1'
+
+
 def put_event(name, date_str):
     """Put the event into the cloud store using the given parameters name and date"""
     # print('putting')
@@ -125,6 +185,15 @@ def delete_event(name, date):
 if __name__ == '__main__':
     """Run the app"""
     app.run()
+
+
+def migrate_events():
+    query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
+    user_root = DS.key('User','user1')
+    key = DS.key(EVENT, user_root)
+    entity = datastore.entity(key=key)
+    for val in query:
+        entity.update(val)
 
 # def fetch_events():
 #     print('fetching')

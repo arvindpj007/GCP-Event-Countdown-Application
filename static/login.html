@@ -2,25 +2,24 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>LOGIN</title>
     <script src="login_script.js"></script>
     <link rel="stylesheet" href="login_styles.css">
     <script src="https://code.jquery.com/jquery-latest.min.js"></script>
 </head>
 <body>
 <div class="login-page">
-  <div class="form" onsubmit="return false">
-    <form id="register-form">
-      <input type="text" placeholder="username"/>
-      <input type="password" placeholder="password"/>
-      <input type="password" placeholder="retype password"/>
-      <button>create</button>
+  <div class="form">
+    <form id="register-form" onsubmit="return false">
+      <input type="text" placeholder="username" id="register_username"/>
+      <input type="password" placeholder="password" id="register_password"/>
+      <button onclick="register_user()">register</button>
       <p class="message">Already registered? <button class="link" onclick="login_form()">Sign In</button></p>
     </form>
     <form id="login-form" onsubmit="return false">
-      <input type="text" placeholder="username"/>
-      <input type="password" placeholder="password"/>
-      <button>login</button>
+      <input type="text" placeholder="username" id="login_username"/>
+      <input type="password" placeholder="password" id="login_password"/>
+      <button onclick="login_user()">login</button>
       <p class="message">Not registered? <button class="link" onclick="register_form()">Create an account</button></p>
     </form>
   </div>
