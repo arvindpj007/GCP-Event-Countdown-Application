@@ -7,7 +7,7 @@ import bcrypt
 
 app = Flask(__name__, static_url_path='')
 app.secret_key = os.urandom(24)
-app.permanent_session_lifetime = timedelta(minutes=1)
+app.permanent_session_lifetime = timedelta(minutes=60)
 
 DS = datastore.Client(project='countdown-252800')
 EVENT = 'Event'  # Name of the event table, can be anything you like.
@@ -16,7 +16,7 @@ USER = 'User'
 
 
 @app.route('/')
-def hello_world():
+def index():
     """ This is the default page.
         get:
             summary: / endpoint.
@@ -25,7 +25,7 @@ def hello_world():
                 200:
                     description: The events list and the option to add a new event.
         """
-    if 'username' in session:
+    if check_session():
         # migrate_events()
         return app.send_static_file('index.html')
     else:
@@ -47,7 +47,7 @@ def events():
                 404:
                     description: Error : null.
         """
-    if 'username' in session:
+    if check_session():
         user = session['username']
         key_space = DS.key('User', user)
         query = DS.query(kind=EVENT, ancestor=key_space).fetch()
@@ -57,7 +57,7 @@ def events():
         # print(len(event_list))
         return jsonify(events=event_list)
     else:
-        return redirect('login.html', 302)
+        return redirect('/loginPage', 302)
 
 
 @app.route('/event', methods=['POST'])
@@ -82,15 +82,17 @@ def event():
                     description: Event ID to be returned.
                     schema: string
         """
-
-    para = request.data.decode('UTF-8').split()
-    name = para[0]
-    r_date = para[1]
-    print(r_date)
-    [y, m, d] = r_date.split('-')
-    date = d + '-' + m + '-' + y
-    x = put_event(name, date)
-    return str(x)
+    if check_session():
+        para = request.data.decode('UTF-8').split()
+        name = para[0]
+        r_date = para[1]
+        print(r_date)
+        [y, m, d] = r_date.split('-')
+        date = d + '-' + m + '-' + y
+        x = put_event(name, date)
+        return str(x)
+    else:
+        return redirect(url_for('login_page'), 302)
 
 
 @app.route('/delete', methods=['POST'])
@@ -114,11 +116,33 @@ def delete():
                     200:
                         description: Event will bbe deleted from cloud store.
             """
-    para2 = request.get_data().decode('UTF-8').split()
-    name = para2[1]
-    r_date = para2[0]
-    delete_event(name, r_date)
-    return "1"
+    if check_session():
+        para2 = request.get_data().decode('UTF-8').split()
+        name = para2[1]
+        r_date = para2[0]
+        delete_event(name, r_date)
+        return "1"
+    else:
+        return redirect(url_for('login_page'), 302)
+
+
+@app.route('/loginPage')
+def login_page():
+    return app.send_static_file('login.html')
+
+
+@app.route('/username')
+def get_username():
+    if check_session():
+        return jsonify(name=session['username'])
+    else:
+        return ' '
+
+
+@app.route('/logoutUser')
+def logout_user():
+    session.pop('username', None)
+    return '1'
 
 
 @app.route('/loginUser', methods=['POST'])
@@ -129,7 +153,7 @@ def login_user():
         password = para[1]
         fetch_password = None
         b_password = password.encode('UTF-8')
-        print(username, password)
+        # print(username, password)
         query = DS.query(kind=USER)
         query.add_filter('username', '=', username)
         next_entity = query.fetch()
@@ -145,6 +169,7 @@ def login_user():
             if bcrypt.checkpw(b_password, fetch_hash):
                 print('correct')
                 session['username'] = username
+                return redirect(url_for('index'), 302)
             else:
                 print('incorrect password')
                 return '0'
@@ -153,12 +178,6 @@ def login_user():
         print(e)
 
     return '1'
-
-
-@app.route('/update_session')
-def update_session():
-    # print(session['username'])
-    return redirect('/', 302)
 
 
 @app.route('/registerUser', methods=['POST'])
@@ -173,10 +192,16 @@ def register_user():
     entity = datastore.Entity(key=DS.key('User'))
     entity.update({'username': username, 'password': s_hashed})
     DS.put(entity)
-    # print(username, password)
-    # except Exception as e:
-    #     print(e)
+    session['username'] = username
+
     return '1'
+
+
+def check_session():
+    if 'username' in session:
+        return True
+    else:
+        return False
 
 
 def put_event(name, date_str):

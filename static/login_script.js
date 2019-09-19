@@ -44,7 +44,7 @@ function login_user(){
             }
             else {
                 alert('User authenticated');
-                window.location.href= "/update_session";
+                window.location.href= '/';
             }
         });
     }
@@ -62,7 +62,7 @@ function register_user(){
         reqJSON('POST','/registerUser',username+' '+password)
         .then(({status,data}) =>{
             alert('user added successfully');
-            document.location.reload();
+             window.location.href= '/';
         });
     }
     else

@@ -22,11 +22,29 @@ function deleteEvent(name,date) {
 
     reqJSON('POST','/delete', date+' '+name)
     .then(({status, data}) =>{
-        alert('The event with name: ' + name + ' and date: ' + date + ' are deleted');
+        if(data != null)
+            alert('The event with name: ' + name + ' and date: ' + date + ' are deleted');
+        else
+            alert('Session Expired');
         document.location.reload();
     });
 
 }
+
+function logout(){
+    reqJSON('GET','/logoutUser');
+    alert('User Logged Out')
+    document.location.reload();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    reqJSON('GET', '/username')
+    .then(({status,data}) => {
+        let html = '<h3>'+data.name+'</h3>';
+        document.getElementById('username').innerHTML = html;
+    });
+});
+
 
 document.addEventListener('DOMContentLoaded', () => {
   reqJSON('GET', '/events')
@@ -104,7 +122,10 @@ document.addEventListener('DOMContentLoaded',() =>{
             var data = document.getElementById('name').value + ' ' + document.getElementById('date').value;
             reqJSON('POST','/event', data)
             .then(({status, data}) =>{
-                alert('event made successfully with id: '+ data);
+                if(data != null)
+                    alert('event made successfully with id: '+ data);
+                else
+                    alert('Session Expired');
                 document.location.reload();
             });
         }
