@@ -20,16 +20,18 @@ def index():
     """ This is the default page.
         get:
             summary: / endpoint.
-            description: renders static file index.html.
+            description: renders static file index.html if session is available.
             responses:
                 200:
                     description: The events list and the option to add a new event.
-        """
+                302:
+                   description: Redirect to login page.
+    """
     if check_session():
         # migrate_events()
         return app.send_static_file('index.html')
     else:
-        return redirect('login.html', 302)
+        return redirect(url_for('login_page'), 302)
 
     # return app.send_static_file('index.html')
 
@@ -46,18 +48,18 @@ def events():
                     schema: [{name:"",date:""}]
                 404:
                     description: Error : null.
-        """
-    if check_session():
-        user = session['username']
-        key_space = DS.key('User', user)
-        query = DS.query(kind=EVENT, ancestor=key_space).fetch()
-        event_list = []
-        for val in query:
-            event_list.append(dict(name=val.get('name'), date=val.get('date')))
-        # print(len(event_list))
-        return jsonify(events=event_list)
-    else:
-        return redirect('/loginPage', 302)
+    """
+    # if check_session():
+    user = session['username']
+    key_space = DS.key('User', user)
+    query = DS.query(kind=EVENT, ancestor=key_space).fetch()
+    event_list = []
+    for val in query:
+        event_list.append(dict(name=val.get('name'), date=val.get('date')))
+    # print(len(event_list))
+    return jsonify(events=event_list)
+    # else:
+    #     return redirect('/loginPage', 302)
 
 
 @app.route('/event', methods=['POST'])
@@ -65,7 +67,7 @@ def event():
     """ To push events to cloud store
         get:
             summary: event endpoint.
-            description: Get name and date through ajax and stores it as an entity in cloud store and returns ID.
+            description: Get name and date and stores it as an entity in cloud store and returns ID.
             parameters:
                 - name: name
                   in: request
@@ -81,72 +83,110 @@ def event():
                 200:
                     description: Event ID to be returned.
                     schema: string
-        """
-    if check_session():
-        para = request.data.decode('UTF-8').split()
-        name = para[0]
-        r_date = para[1]
-        print(r_date)
-        [y, m, d] = r_date.split('-')
-        date = d + '-' + m + '-' + y
-        x = put_event(name, date)
-        return str(x)
-    else:
-        return redirect(url_for('login_page'), 302)
+    """
+    # if check_session():
+    para = request.data.decode('UTF-8').split()
+    name = para[0]
+    r_date = para[1]
+    print(r_date)
+    [y, m, d] = r_date.split('-')
+    date = d + '-' + m + '-' + y
+    x = put_event(name, date)
+    return str(x)
+    # else:
+    #     return redirect(url_for('login_page'), 302)
 
 
 @app.route('/delete', methods=['POST'])
 def delete():
-    """ To implicitly delete events from cloud store
-            get:
-                summary: delete endpoint.
-                description: Get name and date through ajax and use it to delete the event from cloud store.
-                parameters:
-                    - name: name
-                      in: request
-                      description: Event Name
-                      type: string
-                      required: true
-                      - name: date
-                        in: request
-                        description: Event ETA
-                        type: string
-                        required: true
-                responses:
-                    200:
-                        description: Event will bbe deleted from cloud store.
-            """
-    if check_session():
-        para2 = request.get_data().decode('UTF-8').split()
-        name = para2[1]
-        r_date = para2[0]
-        delete_event(name, r_date)
-        return "1"
-    else:
-        return redirect(url_for('login_page'), 302)
+    """ To  delete events from cloud datastore
+        post:
+            summary: delete endpoint.
+            description: Get name and date and use it to delete the event from cloud store.
+            parameters:
+                - name: name
+                  in: request
+                  description: Event Name
+                  type: string
+                  required: true
+                  - name: date
+                    in: request
+                    description: Event ETA
+                    type: string
+                    required: true
+            responses:
+                200:
+                    description: Event will be deleted from cloud store.
+    """
+    # if check_session():
+    para2 = request.get_data().decode('UTF-8').split()
+    name = para2[1]
+    r_date = para2[0]
+    delete_event(name, r_date)
+    return "1"
+    # else:
+    #     return redirect(url_for('login_page'), 302)
 
 
 @app.route('/loginPage')
 def login_page():
+    """ This is the login page
+            get:
+                summary: login and register page.
+                description: Renders the login/register page.
+                responses:
+                    200:
+                        description: Event will bbe deleted from cloud store.
+    """
     return app.send_static_file('login.html')
 
 
-@app.route('/username')
-def get_username():
-    if check_session():
-        return jsonify(name=session['username'])
-    else:
-        return ' '
+# @app.route('/username')
+# def get_username():
+#     if check_session():
+#         return jsonify(name=session['username'])
+#     else:
+#         return redirect(url_for('login_page'), 302)
 
 
 @app.route('/logoutUser')
 def logout_user():
+    """ This is to logout user, or remove session.
+            get:
+                summary: deletes the session cookie to logout user.
+                description: deletes the session cookie.
+                responses:
+                    200:
+                        description: Event will bbe deleted from cloud store.
+    """
     session.pop('username', None)
     return '1'
 
 
 @app.route('/loginUser', methods=['POST'])
 def login_user():
+    """ To verify users
+            get:
+                summary: loginUser endpoint.
+                description: Get name and date and redirects to index.html upon password verification by setting an active session cookie.
+                parameters:
+                    - name: username
+                      in: request
+                      description: Username
+                      type: string
+                      required: true
+                      - name: password
+                        in: request
+                        description: User password
+                        type: string
+                        required: true
+                responses:
+                    200:
+                        description: incorrect username or password.
+                    302:
+                        description: redirects to index.html.
+
+    """
     try:
         para = request.get_data().decode('UTF-8').split()
         username = para[0]
@@ -182,6 +222,25 @@ def login_user():
 
 @app.route('/registerUser', methods=['POST'])
 def register_user():
+    """ To verify users
+            get:
+                summary: registeUser endpoint.
+                description: Get name and date and adds User to cloud datastore followed by setting an active session cookie.
+                parameters:
+                    - name: username
+                      in: request
+                      description: Username
+                      type: string
+                      required: true
+                      - name: password
+                        in: request
+                        description: User password
+                        type: string
+                        required: true
+                responses:
+                    200:
+                        description: register user confirmation.
+    """
     # try:
     para = request.get_data().decode('UTF-8').split()
     username = para[0]
@@ -198,6 +257,7 @@ def register_user():
 
 
 def check_session():
+    """Check session availability"""
     if 'username' in session:
         return True
     else:
@@ -233,15 +293,17 @@ if __name__ == '__main__':
     app.run()
 
 
-def delete_migrate_events():
-    query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
-    for val in query:
-        DS.delete(val.key)
+# def delete_migrate_events():
+#     query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
+#     for val in query:
+#         DS.delete(val.key)
 
 
 def migrate_events():
+    """Migrate the data to the first registered user"""
     query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
-    key_space = DS.key('User', 'user1')
+    user = session['username']
+    key_space = DS.key('User', user)
     key = DS.key(EVENT, parent=key_space)
     for val in query:
         print(val)

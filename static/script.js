@@ -26,8 +26,9 @@ function deleteEvent(name,date) {
             alert('The event with name: ' + name + ' and date: ' + date + ' are deleted');
         else {
             alert('Session Expired');
-             window.location.href= '/loginPage';
+            reqJSON('GET','/loginPage');
         }
+        reqJSON('GET','/');
         document.location.reload();
     });
 
@@ -36,17 +37,12 @@ function deleteEvent(name,date) {
 function logout(){
     reqJSON('GET','/logoutUser');
     alert('User Logged Out');
-    window.location.href= '/loginPage';
+    reqJSON('GET','/loginPage');
+    document.location.reload();
 }
 
 
 document.addEventListener('DOMContentLoaded', () => {
-
-    reqJSON('GET', '/username')
-    .then(({status,data}) => {
-        let html = '<h3>'+data.name+'</h3>';
-        document.getElementById('username').innerHTML = html;
-    });
 
   reqJSON('GET', '/events')
   .then(({status, data}) => {
@@ -61,8 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
         '    <th>Click To Delete</th>\n' +
         '  </tr>';
 
-    if(data == null)
-         window.location.href= '/loginPage';
 
     for (let event of data.events) {
         var datest = event.date.split('-');
@@ -121,7 +115,7 @@ document.addEventListener('DOMContentLoaded',() =>{
         if(time<=0)
         {
             alert('Event cannot be made, The date provided is already passed');
-            document.location.reload();
+            reqJSON('GET','/');
         }
         else
         {
@@ -132,10 +126,11 @@ document.addEventListener('DOMContentLoaded',() =>{
                     alert('event made successfully with id: '+ data);
                 else
                     alert('Session Expired');
-                document.location.reload();
+                reqJSON('GET','/');
             });
         }
     }
+    document.location.reload();
   });
 });
 
