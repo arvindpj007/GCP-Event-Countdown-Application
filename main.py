@@ -1,10 +1,13 @@
+from datetime import timedelta
 from flask import Flask, jsonify, request, session, redirect, url_for
+from flask_session import Session
 from google.cloud import datastore
 import os
 import bcrypt
 
 app = Flask(__name__, static_url_path='')
 app.secret_key = os.urandom(24)
+app.permanent_session_lifetime = timedelta(minutes=1)
 
 DS = datastore.Client(project='countdown-252800')
 EVENT = 'Event'  # Name of the event table, can be anything you like.
@@ -22,7 +25,13 @@ def hello_world():
                 200:
                     description: The events list and the option to add a new event.
         """
-    return app.send_static_file('login.html')
+    if 'username' in session:
+        # migrate_events()
+        return app.send_static_file('index.html')
+    else:
+        return redirect('login.html', 302)
+
+    # return app.send_static_file('index.html')
 
 
 @app.route('/events')
@@ -38,12 +47,17 @@ def events():
                 404:
                     description: Error : null.
         """
-    query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
-    event_list = []
-    for val in query:
-        event_list.append(dict(name=val.get('name'), date=val.get('date')))
-    # print(len(event_list))
-    return jsonify(events=event_list)
+    if 'username' in session:
+        user = session['username']
+        key_space = DS.key('User', user)
+        query = DS.query(kind=EVENT, ancestor=key_space).fetch()
+        event_list = []
+        for val in query:
+            event_list.append(dict(name=val.get('name'), date=val.get('date')))
+        # print(len(event_list))
+        return jsonify(events=event_list)
+    else:
+        return redirect('login.html', 302)
 
 
 @app.route('/event', methods=['POST'])
@@ -68,6 +82,7 @@ def event():
                     description: Event ID to be returned.
                     schema: string
         """
+
     para = request.data.decode('UTF-8').split()
     name = para[0]
     r_date = para[1]
@@ -129,6 +144,7 @@ def login_user():
             fetch_hash = fetch_password.encode('UTF-8')
             if bcrypt.checkpw(b_password, fetch_hash):
                 print('correct')
+                session['username'] = username
             else:
                 print('incorrect password')
                 return '0'
@@ -141,7 +157,8 @@ def login_user():
 
 @app.route('/update_session')
 def update_session():
-    return redirect('/events', 302)
+    # print(session['username'])
+    return redirect('/', 302)
 
 
 @app.route('/registerUser', methods=['POST'])
@@ -165,7 +182,9 @@ def register_user():
 def put_event(name, date_str):
     """Put the event into the cloud store using the given parameters name and date"""
     # print('putting')
-    key = DS.key(EVENT, parent=ROOT)
+    user = session['username']
+    key_space = DS.key('User', user)
+    key = DS.key(EVENT, parent=key_space)
     entity = datastore.Entity(key=key)
     entity.update({'name': name, 'date': date_str})
     DS.put(entity)
@@ -174,7 +193,9 @@ def put_event(name, date_str):
 
 def delete_event(name, date):
     """Delete the event into the cloud store using the given parameters name and date"""
-    query = DS.query(kind=EVENT, ancestor=ROOT)
+    user = session['username']
+    key_space = DS.key('User', user)
+    query = DS.query(kind=EVENT, ancestor=key_space)
     query.add_filter('name', '=', name)
     query.add_filter('date', '=', date)
     next_entity = query.fetch()
@@ -187,13 +208,22 @@ if __name__ == '__main__':
     app.run()
 
 
+def delete_migrate_events():
+    query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
+    for val in query:
+        DS.delete(val.key)
+
+
 def migrate_events():
     query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
-    user_root = DS.key('User','user1')
-    key = DS.key(EVENT, user_root)
-    entity = datastore.entity(key=key)
+    key_space = DS.key('User', 'user1')
+    key = DS.key(EVENT, parent=key_space)
     for val in query:
-        entity.update(val)
+        print(val)
+        entity = datastore.Entity(key=key)
+        entity.update({'name': val['name'], 'date': val['date']})
+        DS.put(entity)
+        DS.delete(val.key)
 
 # def fetch_events():
 #     print('fetching')

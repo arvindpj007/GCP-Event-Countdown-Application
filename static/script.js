@@ -84,14 +84,16 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded',() =>{
 
   document.getElementById('create').addEventListener("click",()=> {
+      //alert('clicked');
     if( !document.getElementById('name').value || !document.getElementById('date').value)
         alert("either name or date is not entered ");
     else {
 
         var datest = document.getElementById('date').value.split('-');
-        var target = new Date(+datest[2], datest[1]-1, +datest[0]);
+        var target = new Date(+datest[0], datest[1]-1, +datest[2]);
         var time = Math.floor((+target - new Date()) / 1000);
-
+        console.log(datest);
+        console.log(time);
         if(time<=0)
         {
             alert('Event cannot be made, The date provided is already passed');
