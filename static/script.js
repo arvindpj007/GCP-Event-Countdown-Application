@@ -24,8 +24,10 @@ function deleteEvent(name,date) {
     .then(({status, data}) =>{
         if(data != null)
             alert('The event with name: ' + name + ' and date: ' + date + ' are deleted');
-        else
+        else {
             alert('Session Expired');
+             window.location.href= '/loginPage';
+        }
         document.location.reload();
     });
 
@@ -33,31 +35,35 @@ function deleteEvent(name,date) {
 
 function logout(){
     reqJSON('GET','/logoutUser');
-    alert('User Logged Out')
-    document.location.reload();
+    alert('User Logged Out');
+    window.location.href= '/loginPage';
 }
 
+
 document.addEventListener('DOMContentLoaded', () => {
+
     reqJSON('GET', '/username')
     .then(({status,data}) => {
         let html = '<h3>'+data.name+'</h3>';
         document.getElementById('username').innerHTML = html;
     });
-});
 
-
-document.addEventListener('DOMContentLoaded', () => {
   reqJSON('GET', '/events')
   .then(({status, data}) => {
 
   setInterval(function () {
-        let html = '<table id="table">' +
-            '<tr>\n' +
-            '    <th>Event Name</th>\n' +
-            '    <th>Event Date (dd-mm-yyyy)</th> \n' +
-            '    <th>Time Left (d:h:m:s)</th>\n' +
-            '    <th>Click To Delete</th>\n' +
-            '  </tr>';
+
+    let html = '<table id="table">' +
+        '<tr>\n' +
+        '    <th>Event Name</th>\n' +
+        '    <th>Event Date (dd-mm-yyyy)</th> \n' +
+        '    <th>Time Left (d:h:m:s)</th>\n' +
+        '    <th>Click To Delete</th>\n' +
+        '  </tr>';
+
+    if(data == null)
+         window.location.href= '/loginPage';
+
     for (let event of data.events) {
         var datest = event.date.split('-');
         var target = new Date(+datest[2], datest[1]-1, +datest[0]);
