@@ -31,7 +31,7 @@ def index():
         # migrate_events()
         return app.send_static_file('index.html')
     else:
-        return redirect(url_for('login_page'), 302)
+        return redirect(url_for('login_page'))
 
     # return app.send_static_file('index.html')
 
@@ -49,15 +49,26 @@ def events():
                 404:
                     description: Error : null.
     """
-    # if check_session():
-    user = session['username']
-    key_space = DS.key('User', user)
-    query = DS.query(kind=EVENT, ancestor=key_space).fetch()
-    event_list = []
-    for val in query:
-        event_list.append(dict(name=val.get('name'), date=val.get('date')))
-    # print(len(event_list))
-    return jsonify(events=event_list)
+    if check_session():
+        try:
+            user = session['username']
+            key_space = DS.key('User', user)
+            query = DS.query(kind=EVENT, ancestor=key_space).fetch()
+            event_list = []
+            for val in query:
+                event_list.append(dict(name=val.get('name'), date=val.get('date')))
+            # print(len(event_list))
+            print('why redirect?')
+            return jsonify(events=event_list)
+
+        except Exception as e:
+            print(e)
+    else:
+        print('redirect')
+        return redirect(url_for('login_page'))
+    print('no redirect')
+
+    return 'events=""'
     # else:
     #     return redirect('/loginPage', 302)
 
@@ -84,17 +95,17 @@ def event():
                     description: Event ID to be returned.
                     schema: string
     """
-    # if check_session():
-    para = request.data.decode('UTF-8').split()
-    name = para[0]
-    r_date = para[1]
-    print(r_date)
-    [y, m, d] = r_date.split('-')
-    date = d + '-' + m + '-' + y
-    x = put_event(name, date)
-    return str(x)
-    # else:
-    #     return redirect(url_for('login_page'), 302)
+    if check_session():
+        para = request.data.decode('UTF-8').split()
+        name = para[0]
+        r_date = para[1]
+        print(r_date)
+        [y, m, d] = r_date.split('-')
+        date = d + '-' + m + '-' + y
+        x = put_event(name, date)
+        return str(x)
+    else:
+        return redirect(url_for('login_page'), 302)
 
 
 @app.route('/delete', methods=['POST'])
@@ -118,17 +129,17 @@ def delete():
                 200:
                     description: Event will be deleted from cloud store.
     """
-    # if check_session():
-    para2 = request.get_data().decode('UTF-8').split()
-    name = para2[1]
-    r_date = para2[0]
-    delete_event(name, r_date)
-    return "1"
-    # else:
-    #     return redirect(url_for('login_page'), 302)
+    if check_session():
+        para2 = request.get_data().decode('UTF-8').split()
+        name = para2[1]
+        r_date = para2[0]
+        delete_event(name, r_date)
+        return "1"
+    else:
+        return redirect(url_for('login_page'), 302)
 
 
-@app.route('/loginPage')
+@app.route('/loginPage', methods=['GET'])
 def login_page():
     """ This is the login page
             get:
@@ -136,7 +147,7 @@ def login_page():
                 description: Renders the login/register page.
                 responses:
                     200:
-                        description: Event will bbe deleted from cloud store.
+                        description: Login Page will be rendered
     """
     return app.send_static_file('login.html')
 
@@ -157,10 +168,10 @@ def logout_user():
                 description: deletes the session cookie.
                 responses:
                     200:
-                        description: Event will bbe deleted from cloud store.
+                        description: User will be logged out and session will be removed.
     """
     session.pop('username', None)
-    return '1'
+    return redirect(url_for('login_page'))
 
 
 @app.route('/loginUser', methods=['POST'])
@@ -208,6 +219,7 @@ def login_user():
             fetch_hash = fetch_password.encode('UTF-8')
             if bcrypt.checkpw(b_password, fetch_hash):
                 print('correct')
+
                 session['username'] = username
                 return redirect(url_for('index'), 302)
             else:
@@ -290,7 +302,7 @@ def delete_event(name, date):
 
 if __name__ == '__main__':
     """Run the app"""
-    app.run()
+    app.run(debug=True)
 
 
 # def delete_migrate_events():

@@ -17,16 +17,16 @@ function reqJSON(method, url, data) {
   });
 }
 
-function deleteEvent(name,date) {
+async function deleteEvent(name,date) {
     console.log('delete:'+name+date);
 
-    reqJSON('POST','/delete', date+' '+name)
+    await reqJSON('POST','/delete', date+' '+name)
     .then(({status, data}) =>{
         if(data != null)
             alert('The event with name: ' + name + ' and date: ' + date + ' are deleted');
         else {
             alert('Session Expired');
-            reqJSON('GET','/loginPage');
+            window.location='/loginPage';
         }
         reqJSON('GET','/');
         document.location.reload();
@@ -34,17 +34,25 @@ function deleteEvent(name,date) {
 
 }
 
-function logout(){
-    reqJSON('GET','/logoutUser');
+async function logout(){
+    await reqJSON('GET','/logoutUser');
     alert('User Logged Out');
-    reqJSON('GET','/loginPage');
-    document.location.reload();
+    window.location='/loginPage';
 }
 
+async function get_events()
+{
+    return await reqJSON('GET', '/events');
+}
+
+async function delete_negative_timer(date,name)
+{
+    return await reqJSON('POST','/delete', date+' '+name);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  reqJSON('GET', '/events')
+  get_events()
   .then(({status, data}) => {
 
   setInterval(function () {
@@ -66,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(time<=0)
         {
            //console.log('negative countdown')
-            reqJSON('POST','/delete', event.date.toString()+' '+event.name.toString())
+            delete_negative_timer(event.date.toString(),event.name.toString())
             .then(({status, data}) =>{
                 alert('The event with name: ' + event.name.toString() + ' and date: ' + event.date.toString() + ' are deleted');
                 document.location.reload();
@@ -125,8 +133,11 @@ document.addEventListener('DOMContentLoaded',() =>{
                 if(data != null)
                     alert('event made successfully with id: '+ data);
                 else
+                {
                     alert('Session Expired');
-                reqJSON('GET','/');
+                    window.location='/loginPage';
+                }
+
             });
         }
     }
