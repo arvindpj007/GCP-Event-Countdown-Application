@@ -1,5 +1,8 @@
-from datetime import timedelta
+import urllib
+import uuid
+from datetime import timedelta, datetime, timezone
 from flask import Flask, jsonify, request, session, redirect, url_for
+import logging
 from flask_session import Session
 from google.cloud import datastore
 import os
@@ -13,6 +16,7 @@ DS = datastore.Client(project='countdown-252800')
 EVENT = 'Event'  # Name of the event table, can be anything you like.
 ROOT = DS.key('Entities', 'root')  # Name of root key, can be anything.
 USER = 'User'
+SESSION = 'Session'
 
 
 @app.route('/')
@@ -27,11 +31,16 @@ def index():
                 302:
                    description: Redirect to login page.
     """
-    if check_session():
+
+    username = get_user()
+
+    print('loading index')
+
+    if not username:
         # migrate_events()
-        return app.send_static_file('index.html')
-    else:
         return redirect(url_for('login_page'))
+    else:
+        return app.send_static_file('index.html')
 
     # return app.send_static_file('index.html')
 
@@ -49,9 +58,11 @@ def events():
                 404:
                     description: Error : null.
     """
-    if check_session():
+    username = get_user()
+
+    if username:
         try:
-            user = session['username']
+            user = username
             key_space = DS.key('User', user)
             query = DS.query(kind=EVENT, ancestor=key_space).fetch()
             event_list = []
@@ -66,6 +77,7 @@ def events():
     else:
         print('redirect')
         return redirect(url_for('login_page'))
+
     print('no redirect')
 
     return 'events=""'
@@ -95,14 +107,16 @@ def event():
                     description: Event ID to be returned.
                     schema: string
     """
-    if check_session():
+    username = get_user()
+
+    if username:
         para = request.data.decode('UTF-8').split()
         name = para[0]
         r_date = para[1]
         print(r_date)
         [y, m, d] = r_date.split('-')
         date = d + '-' + m + '-' + y
-        x = put_event(name, date)
+        x = put_event(username, name, date)
         return str(x)
     else:
         return redirect(url_for('login_page'), 302)
@@ -129,11 +143,12 @@ def delete():
                 200:
                     description: Event will be deleted from cloud store.
     """
-    if check_session():
+    username = get_user()
+    if username:
         para2 = request.get_data().decode('UTF-8').split()
         name = para2[1]
         r_date = para2[0]
-        delete_event(name, r_date)
+        delete_event(username, name, r_date)
         return "1"
     else:
         return redirect(url_for('login_page'), 302)
@@ -170,8 +185,19 @@ def logout_user():
                     200:
                         description: User will be logged out and session will be removed.
     """
-    session.pop('username', None)
-    return redirect(url_for('login_page'))
+    print('logout start')
+    session_cookie = check_session()
+    session_key = DS.key(SESSION, session_cookie)
+    session_now = DS.get(session_key)
+
+    if session_now:
+        DS.delete(session_key)
+
+    resp = redirect('/')
+    resp.set_cookie('user', expires=0)
+
+    print('logout finish')
+    return resp
 
 
 @app.route('/loginUser', methods=['POST'])
@@ -212,24 +238,51 @@ def login_user():
         for val in next_entity:
             fetch_password = val['password']
 
+        session_cookie = check_session()
+        if session_cookie:
+            session_key = DS.key(SESSION, session_cookie)
+            session_now = DS.get(session_key)
+
+            if session_now:
+                print('delete old session')
+                DS.delete(session_key)
+
         if fetch_password is None:
             print('no such user')
-            return '0'
+            params = urllib.parse.urlencode({'error': 'User {} or password incorrect'.format(username)})
+            resp = redirect('/loginUser?' + params)
+            resp.set_cookie('user', expires=0)
+            return resp
+
         else:
             fetch_hash = fetch_password.encode('UTF-8')
             if bcrypt.checkpw(b_password, fetch_hash):
                 print('correct')
+                session_token = str(uuid.uuid4())
+                new_session = datastore.Entity(key=DS.key(SESSION, session_token))
+                new_session.update({
+                    'token': session_token,
+                    'username': username,
+                    'expire': now() + timedelta(hours=1)
+                })
+                print('put new session'+session_token+username)
+                DS.put(new_session)
+                resp = redirect('/')
+                resp.set_cookie('user', session_token, max_age=3600)
+                print('login finish')
+                return resp
 
-                session['username'] = username
-                return redirect(url_for('index'), 302)
             else:
                 print('incorrect password')
-                return '0'
+                params = urllib.parse.urlencode({'error': 'User {} or password incorrect'.format(username)})
+                resp = redirect('/loginUser?' + params)
+                resp.set_cookie('user', expires=0)
+                return resp
 
     except Exception as e:
         print(e)
 
-    return '1'
+    return resp
 
 
 @app.route('/registerUser', methods=['POST'])
@@ -263,23 +316,80 @@ def register_user():
     entity = datastore.Entity(key=DS.key('User'))
     entity.update({'username': username, 'password': s_hashed})
     DS.put(entity)
-    session['username'] = username
 
-    return '1'
+    session_token = str(uuid.uuid4())
+    new_session = datastore.Entity(key=DS.key(SESSION, session_token))
+    new_session.update({
+        'token': session_token,
+        'username': username,
+        'expire': now() + timedelta(hours=1)
+    })
+    DS.put(new_session)
+    resp = redirect('/')
+    resp.set_cookie('user', session_token, max_age=3600)
+    return resp
+
+
+def now():
+    return datetime.now(timezone.utc)
 
 
 def check_session():
     """Check session availability"""
-    if 'username' in session:
-        return True
+    print('checking session')
+    session_cookie = request.cookies.get('user')
+    if not session_cookie:
+        print('no session cookie')
+        return None
+
+    print('session cookie present')
+    return session_cookie
+    # if 'username' in session:
+    #     return True
+    # else:
+    #     return False
+
+
+def get_user():
+    print('getting user')
+    session_cookie = check_session()
+
+    if not session_cookie:
+        print('no session cookie in get user')
+        return None
+
     else:
-        return False
+        print('session cookie present in get user')
+        session_key = DS.key(SESSION, session_cookie)
+        session_now = DS.get(session_key)
+
+        if not session_now:
+            print('session not in database')
+            return None
+
+        expire_time = session_now['expire']
+
+        if expire_time < now():
+            DS.delete(session_key)
+            print('session expired')
+            return None
+
+        query = DS.query(kind=USER)
+        query.add_filter('username', '=', session_now['username'])
+        next_entity = query.fetch()
+        for val in next_entity:
+            if not val:
+                DS.delete(session_key)
+                print('No such user for session')
+                return None
+
+        return session_now['username']
 
 
-def put_event(name, date_str):
+def put_event(username, name, date_str):
     """Put the event into the cloud store using the given parameters name and date"""
     # print('putting')
-    user = session['username']
+    user = username
     key_space = DS.key('User', user)
     key = DS.key(EVENT, parent=key_space)
     entity = datastore.Entity(key=key)
@@ -288,9 +398,9 @@ def put_event(name, date_str):
     return id(DS.key)
 
 
-def delete_event(name, date):
+def delete_event(username, name, date):
     """Delete the event into the cloud store using the given parameters name and date"""
-    user = session['username']
+    user = username
     key_space = DS.key('User', user)
     query = DS.query(kind=EVENT, ancestor=key_space)
     query.add_filter('name', '=', name)
@@ -303,12 +413,6 @@ def delete_event(name, date):
 if __name__ == '__main__':
     """Run the app"""
     app.run(debug=True)
-
-
-# def delete_migrate_events():
-#     query = DS.query(kind=EVENT, ancestor=ROOT).fetch()
-#     for val in query:
-#         DS.delete(val.key)
 
 
 def migrate_events():
