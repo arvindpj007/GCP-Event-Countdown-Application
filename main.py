@@ -1,9 +1,11 @@
+import base64
+import json
+
+import requests
 import urllib
 import uuid
 from datetime import timedelta, datetime, timezone
-from flask import Flask, jsonify, request, session, redirect, url_for
-import logging
-from flask_session import Session
+from flask import Flask, jsonify, request, session, redirect, url_for, Response, make_response, logging
 from google.cloud import datastore
 import os
 import bcrypt
@@ -17,8 +19,10 @@ EVENT = 'Event'  # Name of the event table, can be anything you like.
 ROOT = DS.key('Entities', 'root')  # Name of root key, can be anything.
 USER = 'User'
 SESSION = 'Session'
+CLIENT = 'Client'
 
 
+# python decorator
 @app.route('/')
 def index():
     """ This is the default page.
@@ -164,7 +168,12 @@ def login_page():
                     200:
                         description: Login Page will be rendered
     """
-    return app.send_static_file('login.html')
+    state = str(uuid.uuid4())
+    nonce = str(uuid.uuid4())
+    resp = make_response(app.send_static_file('login.html'))
+    resp.set_cookie(key='state', value=state)
+    resp.set_cookie(key='nonce', value=nonce)
+    return resp
 
 
 # @app.route('/username')
@@ -265,7 +274,7 @@ def login_user():
                     'username': username,
                     'expire': now() + timedelta(hours=1)
                 })
-                print('put new session'+session_token+username)
+                print('put new session' + session_token + username)
                 DS.put(new_session)
                 resp = redirect('/')
                 resp.set_cookie('user', session_token, max_age=3600)
@@ -328,6 +337,77 @@ def register_user():
     resp = redirect('/')
     resp.set_cookie('user', session_token, max_age=3600)
     return resp
+
+
+@app.route('/oidauth', methods=['GET'])
+def oidc():
+    # try:
+    query = DS.query(kind=CLIENT)
+    next_entity = query.fetch()
+
+    state_cookie = request.cookies.get('state')
+    nonce_cookie = request.cookies.get('nonce')
+    state_param = request.args['state']
+    # nonce_param = request.args['nonce']
+    code = request.args['code']
+    redirect_uri = 'https://countdown-252800.appspot.com/oidauth'
+
+    for val in next_entity:
+        client_id = val['client_id']
+        client_secret = val['client_secret']
+        break
+
+    if state_param == state_cookie:
+        response = requests.post("https://www.googleapis.com/oauth2/v4/token",
+                                 {"code": code,
+                                  "client_id": client_id,
+                                  # '145521786032-soglnbfd91ivkn97t9uou964p0di6ldb.apps.googleusercontent.com',
+                                  "client_secret": client_secret,  # 'hOAWBmMSHitgqgit2Rlcc3Mw',
+                                  "redirect_uri": 'https://countdown-252800.appspot.com/oidauth',
+                                  "grant_type": "authorization_code"})
+
+        id_token = response.json()['id_token']
+        _, body, _ = id_token.split('.')
+        body += '=' * (-len(body) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(body.encode('utf-8')))
+        sub = claims['sub']
+        nonce = claims['nonce']
+        email = claims['email']
+
+        if nonce == nonce_cookie:
+            query = DS.query(kind=USER)
+            query.add_filter('username', '=', email)
+            next_user = query.fetch()
+            for val in next_user:
+                if not val:
+                    entity = datastore.Entity(key=DS.key('User'))
+                    entity.update({'username': email, 'passkey': sub})
+                    DS.put(entity)
+
+            session_token = str(uuid.uuid4())
+            new_session = datastore.Entity(key=DS.key(SESSION, session_token))
+            new_session.update({
+                'token': session_token,
+                'username': email,
+                'expire': now() + timedelta(hours=1)
+            })
+            DS.put(new_session)
+            resp = redirect('/')
+            resp.set_cookie('user', session_token, max_age=3600)
+            return resp
+            item = 'done'
+        else:
+            item = 'csrf attack alert'
+    else:
+        item = 'csrf attack alert'
+
+    # logging.warning(response.json())
+    # print(response)
+    # except Exception as e:
+    #     print(e)
+    # logging.warning(e)
+
+    return item
 
 
 def now():
@@ -412,7 +492,7 @@ def delete_event(username, name, date):
 
 if __name__ == '__main__':
     """Run the app"""
-    app.run(debug=True)
+    app.run(host='::', port=5000, debug=True)
 
 
 def migrate_events():

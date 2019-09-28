@@ -84,3 +84,25 @@ document.addEventListener('DOMContentLoaded',() => {
     document.getElementById('login-form').style.display="initial";
     document.getElementById('register-form').style.display="none";
 });
+
+function getCookie(name) {
+  var value = "; " + document.cookie;
+  var parts = value.split("; " + name + "=");
+  if (parts.length == 2) return parts.pop().split(";").shift();
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+   var state = getCookie('state');
+   var nonce = getCookie('nonce');
+   var clientid = "145521786032-soglnbfd91ivkn97t9uou964p0di6ldb.apps.googleusercontent.com";
+   var url = "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=" +
+        clientid +
+       "&scope=openid%20email&state=" +
+       state +
+       "&nonce=" +
+       nonce +
+       "&redirect_uri=https%3A//" +
+       "countdown-252800.appspot.com/oidauth";
+   document.getElementById('g_login').href = url;
+   document.getElementById('g_register').href = url;
+});
