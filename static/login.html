@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="google-signin-client_id" content="145521786032-uduk55u25r0spmqhlbumd6obduju7t6m.apps.googleusercontent.com">
     <title>LOGIN</title>
     <script src="login_script.js"></script>
     <link rel="stylesheet" href="login_styles.css">
@@ -14,12 +15,16 @@
       <input type="text" placeholder="username" id="register_username"/>
       <input type="password" placeholder="password" id="register_password"/>
       <button onclick="register_user()">register</button>
+      <br><br>
+      <button><a id="g_register"> sign in with Google</a> </button>
       <p class="message">Already registered? <button class="link" onclick="login_form()">Sign In</button></p>
     </form>
     <form id="login-form" onsubmit="return false">
       <input type="text" placeholder="username" id="login_username"/>
       <input type="password" placeholder="password" id="login_password"/>
       <button onclick="login_user()">login</button>
+      <br><br>
+      <button><a id="g_login"> Sign in with Google</a> </button>
       <p class="message">Not registered? <button class="link" onclick="register_form()">Create an account</button></p>
     </form>
   </div>
